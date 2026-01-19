@@ -1,5 +1,5 @@
 import os
-from telegram import Update
+from telegram import Update, Bot
 from telegram.ext import (
     ApplicationBuilder,
     MessageHandler,
@@ -12,6 +12,10 @@ import openai
 # ================== ENV ==================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+if not BOT_TOKEN or not OPENAI_API_KEY:
+    print("❌ المفاتيح مش موجودة في ENV")
+    exit(1)
 
 openai.api_key = OPENAI_API_KEY
 
@@ -95,12 +99,15 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================== MAIN ==================
 def main():
-    if not BOT_TOKEN or not OPENAI_API_KEY:
-        print("❌ المفاتيح مش موجودة في ENV")
-        return
+    # 🟢 مسح أي Webhook قديم قبل Polling
+    bot = Bot(token=BOT_TOKEN)
+    bot.delete_webhook()
+    print("✅ أي Webhook قديم تم مسحه. الآن البوت شغال على Polling.")
 
+    # إنشاء التطبيق
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
+    # إضافة الـ Handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("reset", reset))
     app.add_handler(CommandHandler("image", image))
