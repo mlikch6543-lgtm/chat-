@@ -1,8 +1,6 @@
 import os
-import random
-import datetime
 import openai
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 # ================== ENV ==================
@@ -10,121 +8,95 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 if not BOT_TOKEN or not OPENAI_API_KEY:
-    raise RuntimeError("Missing ENV variables")
+    raise RuntimeError("Missing environment variables")
 
 openai.api_key = OPENAI_API_KEY
 
 # ================== SYSTEM PROMPT ==================
 SYSTEM_PROMPT = """
-أنت أب كاهن قبطي أرثوذكسي رسمي.
+أنت أب كاهن قبطي أرثوذكسي.
 تجيب فقط على الأسئلة الخاصة بالإيمان المسيحي الأرثوذكسي.
 
 طريقة الإجابة:
-1- آية أو مرجع كتابي
-2- شرح حسب تعليم الكنيسة القبطية
-3- توجيه رعوي عملي
+- إجابة واضحة ومنظمة
+- لغة بسيطة ومفهومة
+- تعليم كنسي سليم
+- لمسة رعوية أبوية
 
-أسلوبك أبوي وكنسي مصري.
+مصادرك:
+- الكتاب المقدس
+- تعليم الكنيسة القبطية الأرثوذكسية
+- الفهم الكنسي العام للآباء
+
+ممنوع تمامًا:
+- المقارنة بين الأديان
+- الفلسفة
+- العلم التجريبي
+- السياسة
+- أي عقيدة غير أرثوذكسية
+
+لو السؤال خارج الإيمان الأرثوذكسي:
+ارفض الإجابة بمحبة ووضوح،
+وقل إننا نركز على التعليم الأرثوذكسي وخلاص النفس.
 """
 
-# ================== USERS ==================
-users = set()
-
-# ================== KEYBOARD ==================
-keyboard = ReplyKeyboardMarkup(
-    [
-        ["📖 آية", "🙏 صلاة"],
-        ["⛪ قديس اليوم", "📅 قراءات اليوم"],
-        ["🔄 إعادة ضبط"]
-    ],
-    resize_keyboard=True
-)
-
-# ================== CONTENT ==================
-VERSES = [
-    "«الرب نوري وخلاصي ممن أخاف» (مزمور 27)",
-    "«بدوني لا تقدرون أن تفعلوا شيئًا» (يوحنا 15:5)",
-    "«قريب هو الرب من المنسحقين القلوب» (مزمور 34)"
-]
-
-MORNING_MSGS = [
-    "☀️ صباح الخير مع ربنا\n«هذا هو اليوم الذي صنعه الرب» (مزمور 118)"
-]
-
-EVENING_MSGS = [
-    "🌙 قبل ما تنام\nراجع يومك قدام ربنا واطلب سلامه."
-]
-
-FEASTS = {
-    "01-07": "🎄 صوم الميلاد – استعد لمجيء المخلص",
-    "01-19": "💧 عيد الغطاس المجيد",
-    "04-28": "✝️ عيد القيامة المجيد"
-}
+# ================== MEMORY ==================
+user_sessions = {}
 
 # ================== COMMANDS ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    users.add(update.effective_user.id)
+    user_sessions[update.effective_user.id] = [
+        {"role": "system", "content": SYSTEM_PROMPT}
+    ]
+
     await update.message.reply_text(
-        "✝️ أهلاً بيك\n"
-        "أنا بوت كنسي أرثوذكسي للإرشاد الروحي.\n"
-        "🛠️ تطوير: جرجس رضا",
-        reply_markup=keyboard
+        "✝️ أهلاً بيك\n\n"
+        "أنا بوت كنسي مسيحي قبطي أرثوذكسي.\n\n"
+        "مهمتي أجاوب على أي سؤال يخص:\n"
+        "• الإيمان المسيحي الأرثوذكسي\n"
+        "• الكتاب المقدس\n"
+        "• التعليم الكنسي\n"
+        "• الحياة الروحية\n\n"
+        "الإجابات بتكون:\n"
+        "✔️ واضحة\n"
+        "✔️ مرتبة\n"
+        "✔️ حسب تعليم الكنيسة\n\n"
+        "❗ أي سؤال خارج الإيمان الأرثوذكسي لن يتم الرد عليه.\n\n"
+        "🛠️ تم تطويري بواسطة: جرجس رضا\n\n"
+        "اتفضل اسأل بكل بساطة 🙏"
     )
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    users.discard(update.effective_user.id)
-    await update.message.reply_text("🔄 تم إعادة الضبط", reply_markup=keyboard)
-
-# ================== BUTTONS ==================
-async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-
-    if text == "📖 آية":
-        await update.message.reply_text(random.choice(VERSES))
-    elif text == "🙏 صلاة":
-        await update.message.reply_text("يا رب يسوع المسيح ارحمنا وبارك يومنا.")
-    elif text == "🔄 إعادة ضبط":
-        await reset(update, context)
-    else:
-        await chat(update, context)
+    user_sessions.pop(update.effective_user.id, None)
+    await update.message.reply_text("🔄 تم بدء محادثة جديدة.\nاتفضل اسأل ✝️")
 
 # ================== CHAT ==================
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
     text = update.message.text
 
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": text}
-    ]
+    if uid not in user_sessions:
+        user_sessions[uid] = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    user_sessions[uid].append({"role": "user", "content": text})
 
     try:
         response = openai.chat.completions.create(
             model="gpt-4o-mini",
-            messages=messages,
+            messages=user_sessions[uid],
             temperature=0.2
         )
-        await update.message.reply_text(response.choices[0].message.content)
-    except:
+
+        reply = response.choices[0].message.content
+        user_sessions[uid].append({"role": "assistant", "content": reply})
+
+        await update.message.reply_text(reply)
+
+    except Exception:
         await update.message.reply_text(
-            "السؤال ده خارج تعليم الكنيسة الأرثوذكسية.\nخلّينا نركّز على خلاص النفس ✝️"
+            "يا حبيبي، السؤال ده خارج نطاق التعليم الأرثوذكسي.\n"
+            "خلّينا نركّز على الإيمان وخلاص النفس ✝️"
         )
-
-# ================== JOBS ==================
-async def morning_job(context):
-    msg = random.choice(MORNING_MSGS)
-    for u in users:
-        await context.bot.send_message(u, msg)
-
-async def evening_job(context):
-    msg = random.choice(EVENING_MSGS)
-    for u in users:
-        await context.bot.send_message(u, msg)
-
-async def feast_job(context):
-    today = datetime.datetime.utcnow().strftime("%m-%d")
-    if today in FEASTS:
-        for u in users:
-            await context.bot.send_message(u, FEASTS[today])
 
 # ================== MAIN ==================
 def main():
@@ -132,13 +104,9 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("reset", reset))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_buttons))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
 
-    app.job_queue.run_daily(morning_job, time=datetime.time(8, 0))
-    app.job_queue.run_daily(evening_job, time=datetime.time(21, 0))
-    app.job_queue.run_daily(feast_job, time=datetime.time(7, 30))
-
-    print("✝️ Orthodox Full Service Bot Running...")
+    print("✝️ Orthodox Christian Bot Running...")
     app.run_polling()
 
 if __name__ == "__main__":
