@@ -1,6 +1,7 @@
 import os
 import openai
-from telegram import Update, Bot
+import random
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -14,17 +15,54 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 if not BOT_TOKEN or not OPENAI_API_KEY:
-    raise RuntimeError("ENV variables BOT_TOKEN أو OPENAI_API_KEY مش موجودة")
+    raise RuntimeError("ENV variables missing")
 
 openai.api_key = OPENAI_API_KEY
 
 # ================== SYSTEM PROMPT ==================
 SYSTEM_PROMPT = """
-أنت مساعد مسيحي شبيه ChatGPT.
-متخصص في تفسير الكتاب المقدس،
-الإجابة على الأسئلة الروحية،
-والشرح البسيط المليان محبة.
+أنت أب كاهن وأب اعتراف أرثوذكسي.
+تتكلم باللهجة المصرية الكنسية.
+أسلوبك هادي، مش مُدين، مش متشدد.
+ترشد بمحبة، تشجع التوبة، الصلاة، والرجاء.
+كلامك قصير، عميق، وأبوي.
 """
+
+# ================== KEYBOARD ==================
+keyboard = ReplyKeyboardMarkup(
+    [
+        ["📖 آية", "⛪ قديس اليوم"],
+        ["📅 إنجيل اليوم", "🙏 صلاة"],
+        ["💭 سؤال روحي", "🔄 إعادة ضبط"]
+    ],
+    resize_keyboard=True
+)
+
+# ================== DATA ==================
+VERSES = [
+    "«تَعَالَوْا إِلَيَّ يَا جَمِيعَ الْمُتْعَبِينَ وَالثَّقِيلِي الأَحْمَالِ وَأَنَا أُرِيحُكُمْ» (متى 11:28)",
+    "«الرَّبُّ قَرِيبٌ مِنَ الْمُنْكَسِرِي الْقُلُوبِ» (مزمور 34:18)"
+]
+
+SAINTS = [
+    "✝️ القديس مارمرقس الرسول – كاروز الديار المصرية",
+    "✝️ الأنبا أنطونيوس – أب جميع الرهبان",
+    "✝️ الأنبا شنوده رئيس المتوحدين"
+]
+
+GOSPEL_TODAY = [
+    "📖 إنجيل اليوم:\n«أَنَا هُوَ الطَّرِيقُ وَالْحَقُّ وَالْحَيَاةُ» (يوحنا 14:6)"
+]
+
+PRAYERS = [
+    "🙏 يا رب يسوع المسيح، ارحمني أنا الخاطئ، واملأ قلبي سلامًا.",
+    "🙏 ربنا يسوع، سلّم قلبي بين إيديك، وعلّمني أمشي في طريقك."
+]
+
+QUESTIONS = [
+    "💭 هل علاقتك بربنا فيها صلاة حقيقية ولا مجرد عادة؟",
+    "💭 إمتى آخر مرة اعترفت من قلبك؟"
+]
 
 # ================== MEMORY ==================
 user_sessions = {}
@@ -32,43 +70,40 @@ user_sessions = {}
 # ================== COMMANDS ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "✝️ أهلاً بيك!\n\n"
-        "أنا مساعد مسيحي.\n"
-        "اسأل أي سؤال كتابي أو روحي.\n\n"
-        "🖼️ لإنشاء صورة:\n"
-        "/image وصف الصورة"
-        "اعداد :Gerges Reda"
+        "✝️ أهلاً بيك يا حبيب قلبي\n\n"
+        "أنا أب كنسي ومعلم أرثوذكسي،\n"
+        "موجود أسمعك وأرشدك بمحبة.\n\n"
+        "⛪ اسأل براحتك، وخد وقتك.\n"
+        "ربنا معاك 🤍\n\n"
+        "🛠️ تم تطويري بواسطة: جرجس رضا",
+        reply_markup=keyboard
     )
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_sessions.clear()
-    await update.message.reply_text("🔄 تم مسح المحادثة.")
-
-# ================== IMAGE ==================
-async def image(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.message.reply_text("🖼️ اكتب وصف الصورة بعد /image")
-        return
-
-    prompt = " ".join(context.args)
-    await update.message.reply_text("🎨 جاري إنشاء الصورة...")
-
-    try:
-        result = openai.images.generate(
-            model="gpt-image-1",
-            prompt=f"Christian religious art, sacred style: {prompt}",
-            size="1024x1024"
-        )
-        await update.message.reply_photo(result.data[0].url)
-    except Exception as e:
-        print(e)
-        await update.message.reply_text("❌ حصل خطأ أثناء إنشاء الصورة")
-
-# ================== PHOTO ==================
-async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📷 وصلت الصورة.\nاكتب: ايه ده؟ أو اسألني عنها."
+        "🔄 ابتدينا من جديد… ربنا يجدّد قلبك ✝️",
+        reply_markup=keyboard
     )
+
+# ================== BUTTON HANDLERS ==================
+async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+
+    if text == "📖 آية":
+        await update.message.reply_text(random.choice(VERSES))
+    elif text == "⛪ قديس اليوم":
+        await update.message.reply_text(random.choice(SAINTS))
+    elif text == "📅 إنجيل اليوم":
+        await update.message.reply_text(random.choice(GOSPEL_TODAY))
+    elif text == "🙏 صلاة":
+        await update.message.reply_text(random.choice(PRAYERS))
+    elif text == "💭 سؤال روحي":
+        await update.message.reply_text(random.choice(QUESTIONS))
+    elif text == "🔄 إعادة ضبط":
+        await reset(update, context)
+    else:
+        await chat(update, context)
 
 # ================== CHAT ==================
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -76,9 +111,7 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
     if user_id not in user_sessions:
-        user_sessions[user_id] = [
-            {"role": "system", "content": SYSTEM_PROMPT}
-        ]
+        user_sessions[user_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     user_sessions[user_id].append({"role": "user", "content": text})
 
@@ -86,31 +119,29 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response = openai.chat.completions.create(
             model="gpt-4o-mini",
             messages=user_sessions[user_id],
-            temperature=0.4
+            temperature=0.3
         )
+
         reply = response.choices[0].message.content
         user_sessions[user_id].append({"role": "assistant", "content": reply})
         await update.message.reply_text(reply)
-    except Exception as e:
-        print(e)
-        await update.message.reply_text("❌ حصل خطأ أثناء الرد")
+
+    except Exception:
+        await update.message.reply_text(
+            "ربنا يدّيك سلام… خلّينا نكمّل بهدوء 🙏"
+        )
 
 # ================== MAIN ==================
 def main():
-    # حل نهائي لمشكلة Conflict
-    bot = Bot(token=BOT_TOKEN)
-    bot.delete_webhook(drop_pending_updates=True)
-    print("✅ Webhook deleted – Polling safe")
-
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("reset", reset))
-    app.add_handler(CommandHandler("image", image))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, buttons)
+    )
 
-    print("🤖 Bot is running...")
+    print("✝️ Orthodox Confessor Bot is running...")
     app.run_polling()
 
 if __name__ == "__main__":
