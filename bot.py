@@ -10,14 +10,16 @@ from telegram.ext import (
 import openai
 
 # ================== ENV ==================
-BOT_TOKEN = "7664154726:AAGpxqrDNCbk8W1ihUtQW9pqOWnXo6vPIuE"
-OPENAI_API_KEY = "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"
-openai.api_key = "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"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+openai.api_key = OPENAI_API_KEY
 
 # ================== SYSTEM PROMPT ==================
 SYSTEM_PROMPT = """
 أنت مساعد مسيحي شبيه ChatGPT.
-متخصص في تفسير الكتاب المقدس، الإجابة على الأسئلة الروحية،
+متخصص في تفسير الكتاب المقدس،
+الإجابة على الأسئلة الروحية،
 والشرح البسيط المليان محبة.
 """
 
@@ -63,8 +65,7 @@ async def image(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📷 وصلت الصورة.\n"
-        "اكتب: *ايه ده؟* أو اسألني عنها.",
-        parse_mode="Markdown"
+        "اكتب: ايه ده؟ أو اسألني عنها."
     )
 
 # ================== CHAT ==================
@@ -94,6 +95,10 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================== MAIN ==================
 def main():
+    if not BOT_TOKEN or not OPENAI_API_KEY:
+        print("❌ المفاتيح مش موجودة في ENV")
+        return
+
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -102,7 +107,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
 
-    print("Bot is running...")
+    print("🤖 Bot is running...")
     app.run_polling()
 
 if __name__ == "__main__":
