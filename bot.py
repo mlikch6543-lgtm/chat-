@@ -37,7 +37,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "اسأل أي سؤال كتابي أو روحي.\n\n"
         "🖼️ لإنشاء صورة:\n"
         "/image وصف الصورة"
-        "اعداد :Gerges Reda
+        "اعداد :Gerges Reda"
     )
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
