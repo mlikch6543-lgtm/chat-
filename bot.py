@@ -1,21 +1,20 @@
 import os
+import openai
 from telegram import Update, Bot
 from telegram.ext import (
     ApplicationBuilder,
-    MessageHandler,
     CommandHandler,
+    MessageHandler,
     ContextTypes,
     filters
 )
-import openai
 
 # ================== ENV ==================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 if not BOT_TOKEN or not OPENAI_API_KEY:
-    print("❌ المفاتيح مش موجودة في ENV")
-    exit(1)
+    raise RuntimeError("ENV variables BOT_TOKEN أو OPENAI_API_KEY مش موجودة")
 
 openai.api_key = OPENAI_API_KEY
 
@@ -34,11 +33,10 @@ user_sessions = {}
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "✝️ أهلاً بيك!\n\n"
-        "أنا مساعد مسيحي زي ChatGPT.\n"
+        "أنا مساعد مسيحي.\n"
         "اسأل أي سؤال كتابي أو روحي.\n\n"
-        "🖼️ لإنشاء صورة مسيحية:\n"
-        "/image وصف الصورة\n\n"
-        "⚙️ إعداد: جرجس رضا"
+        "🖼️ لإنشاء صورة:\n"
+        "/image وصف الصورة"
     )
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -62,14 +60,13 @@ async def image(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_photo(result.data[0].url)
     except Exception as e:
-        await update.message.reply_text("❌ حصل خطأ أثناء إنشاء الصورة")
         print(e)
+        await update.message.reply_text("❌ حصل خطأ أثناء إنشاء الصورة")
 
 # ================== PHOTO ==================
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📷 وصلت الصورة.\n"
-        "اكتب: ايه ده؟ أو اسألني عنها."
+        "📷 وصلت الصورة.\nاكتب: ايه ده؟ أو اسألني عنها."
     )
 
 # ================== CHAT ==================
@@ -94,20 +91,18 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_sessions[user_id].append({"role": "assistant", "content": reply})
         await update.message.reply_text(reply)
     except Exception as e:
-        await update.message.reply_text("❌ حصل خطأ أثناء الرد")
         print(e)
+        await update.message.reply_text("❌ حصل خطأ أثناء الرد")
 
 # ================== MAIN ==================
 def main():
-    # 🟢 مسح أي Webhook قديم قبل Polling
+    # حل نهائي لمشكلة Conflict
     bot = Bot(token=BOT_TOKEN)
-    bot.delete_webhook()
-    print("✅ أي Webhook قديم تم مسحه. الآن البوت شغال على Polling.")
+    bot.delete_webhook(drop_pending_updates=True)
+    print("✅ Webhook deleted – Polling safe")
 
-    # إنشاء التطبيق
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # إضافة الـ Handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("reset", reset))
     app.add_handler(CommandHandler("image", image))
