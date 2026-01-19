@@ -1,6 +1,6 @@
 import os
-import openai
 import random
+import openai
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -15,121 +15,93 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 if not BOT_TOKEN or not OPENAI_API_KEY:
-    raise RuntimeError("ENV variables missing")
+    raise RuntimeError("Missing ENV variables")
 
 openai.api_key = OPENAI_API_KEY
 
 # ================== SYSTEM PROMPT ==================
 SYSTEM_PROMPT = """
-أنت أب كاهن وأب اعتراف أرثوذكسي.
-تتكلم باللهجة المصرية الكنسية.
-أسلوبك هادي، مش مُدين، مش متشدد.
-ترشد بمحبة، تشجع التوبة، الصلاة، والرجاء.
-كلامك قصير، عميق، وأبوي.
+أنت أب كاهن قبطي أرثوذكسي.
+تلتزم فقط بتعليم الكنيسة القبطية الأرثوذكسية.
+أسلوبك أبوي، دقيق، ومشجع.
 """
+
+# ================== STORAGE ==================
+users = set()
 
 # ================== KEYBOARD ==================
 keyboard = ReplyKeyboardMarkup(
     [
         ["📖 آية", "⛪ قديس اليوم"],
-        ["📅 إنجيل اليوم", "🙏 صلاة"],
-        ["💭 سؤال روحي", "🔄 إعادة ضبط"]
+        ["📅 قراءات اليوم", "🙏 صلاة"],
+        ["💭 سؤال روحي"],
+        ["🔄 إعادة ضبط"]
     ],
     resize_keyboard=True
 )
 
-# ================== DATA ==================
-VERSES = [
-    "«تَعَالَوْا إِلَيَّ يَا جَمِيعَ الْمُتْعَبِينَ وَالثَّقِيلِي الأَحْمَالِ وَأَنَا أُرِيحُكُمْ» (متى 11:28)",
-    "«الرَّبُّ قَرِيبٌ مِنَ الْمُنْكَسِرِي الْقُلُوبِ» (مزمور 34:18)"
+# ================== DAILY VERSES ==================
+DAILY_VERSES = [
+    "«اطلبوا أولًا ملكوت الله وبره» (متى 6:33)",
+    "«بدوني لا تقدرون أن تفعلوا شيئًا» (يوحنا 15:5)",
+    "«كن أمينًا إلى الموت» (رؤيا 2:10)",
+    "«قريب هو الرب من المنسحقين القلوب» (مزمور 34)",
+    "«طوبى لأنقياء القلب لأنهم يعاينون الله» (متى 5:8)",
+    "«الرب نوري وخلاصي ممن أخاف» (مزمور 27)"
 ]
-
-SAINTS = [
-    "✝️ القديس مارمرقس الرسول – كاروز الديار المصرية",
-    "✝️ الأنبا أنطونيوس – أب جميع الرهبان",
-    "✝️ الأنبا شنوده رئيس المتوحدين"
-]
-
-GOSPEL_TODAY = [
-    "📖 إنجيل اليوم:\n«أَنَا هُوَ الطَّرِيقُ وَالْحَقُّ وَالْحَيَاةُ» (يوحنا 14:6)"
-]
-
-PRAYERS = [
-    "🙏 يا رب يسوع المسيح، ارحمني أنا الخاطئ، واملأ قلبي سلامًا.",
-    "🙏 ربنا يسوع، سلّم قلبي بين إيديك، وعلّمني أمشي في طريقك."
-]
-
-QUESTIONS = [
-    "💭 هل علاقتك بربنا فيها صلاة حقيقية ولا مجرد عادة؟",
-    "💭 إمتى آخر مرة اعترفت من قلبك؟"
-]
-
-# ================== MEMORY ==================
-user_sessions = {}
 
 # ================== COMMANDS ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    users.add(update.effective_user.id)
+
     await update.message.reply_text(
-        "✝️ أهلاً بيك يا حبيب قلبي\n\n"
-        "أنا أب كنسي ومعلم أرثوذكسي،\n"
-        "موجود أسمعك وأرشدك بمحبة.\n\n"
-        "⛪ اسأل براحتك، وخد وقتك.\n"
-        "ربنا معاك 🤍\n\n"
-        "🛠️ تم تطويري بواسطة: جرجس رضا",
+        "✝️ أهلاً بيك في البوت الكنسي الأرثوذكسي\n\n"
+        "من دلوقتي هيوصلك كل يوم إشعار بآية من الكتاب المقدس.\n\n"
+        "🛠️ تطوير: جرجس رضا",
         reply_markup=keyboard
     )
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_sessions.clear()
-    await update.message.reply_text(
-        "🔄 ابتدينا من جديد… ربنا يجدّد قلبك ✝️",
-        reply_markup=keyboard
-    )
+    users.discard(update.effective_user.id)
+    await update.message.reply_text("🔄 تم إعادة الضبط ✝️", reply_markup=keyboard)
 
-# ================== BUTTON HANDLERS ==================
-async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ================== BUTTONS ==================
+async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
     if text == "📖 آية":
-        await update.message.reply_text(random.choice(VERSES))
-    elif text == "⛪ قديس اليوم":
-        await update.message.reply_text(random.choice(SAINTS))
-    elif text == "📅 إنجيل اليوم":
-        await update.message.reply_text(random.choice(GOSPEL_TODAY))
+        await update.message.reply_text(random.choice(DAILY_VERSES))
+
     elif text == "🙏 صلاة":
-        await update.message.reply_text(random.choice(PRAYERS))
+        await update.message.reply_text("يا رب يسوع المسيح، بارك هذا اليوم وعلّمنا طريقك.")
+
+    elif text == "⛪ قديس اليوم":
+        await update.message.reply_text("القديس الأنبا أنطونيوس – مثال الجهاد والصلاة.")
+
+    elif text == "📅 قراءات اليوم":
+        await update.message.reply_text("إنجيل اليوم: يوحنا 6 – خبز الحياة.")
+
     elif text == "💭 سؤال روحي":
-        await update.message.reply_text(random.choice(QUESTIONS))
+        await update.message.reply_text("هل صلاتك نابعة من قلبك أم عادة؟")
+
     elif text == "🔄 إعادة ضبط":
         await reset(update, context)
+
     else:
-        await chat(update, context)
-
-# ================== CHAT ==================
-async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    text = update.message.text
-
-    if user_id not in user_sessions:
-        user_sessions[user_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
-
-    user_sessions[user_id].append({"role": "user", "content": text})
-
-    try:
-        response = openai.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=user_sessions[user_id],
-            temperature=0.3
-        )
-
-        reply = response.choices[0].message.content
-        user_sessions[user_id].append({"role": "assistant", "content": reply})
-        await update.message.reply_text(reply)
-
-    except Exception:
         await update.message.reply_text(
-            "ربنا يدّيك سلام… خلّينا نكمّل بهدوء 🙏"
+            "خلّينا نركّز على التعليم الروحي الأرثوذكسي ✝️"
         )
+
+# ================== DAILY JOB ==================
+async def daily_verse(context: ContextTypes.DEFAULT_TYPE):
+    verse = random.choice(DAILY_VERSES)
+    message = f"📖 آية اليوم:\n\n{verse}\n\nربنا يبارك يومك ✝️"
+
+    for uid in users:
+        try:
+            await context.bot.send_message(chat_id=uid, text=message)
+        except:
+            pass
 
 # ================== MAIN ==================
 def main():
@@ -137,11 +109,15 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("reset", reset))
-    app.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, buttons)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_buttons))
+
+    # إشعار يومي – 9 صباحًا بتوقيت السيرفر
+    app.job_queue.run_daily(
+        daily_verse,
+        time=__import__("datetime").time(hour=9, minute=0)
     )
 
-    print("✝️ Orthodox Confessor Bot is running...")
+    print("✝️ Orthodox Bot with Daily Notifications Running...")
     app.run_polling()
 
 if __name__ == "__main__":
