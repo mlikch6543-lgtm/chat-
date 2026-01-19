@@ -11,8 +11,8 @@ import openai
 
 # ================== ENV ==================
 BOT_TOKEN = "7664154726:AAGpxqrDNCbk8W1ihUtQW9pqOWnXo6vPIuE"
-OPENAI_API_KEY = "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"
-openai.api_key = "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"
+OPENAI_API_KEY = "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"
+openai.api_key = "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"
 
 # ================== SYSTEM PROMPT ==================
 SYSTEM_PROMPT = """
