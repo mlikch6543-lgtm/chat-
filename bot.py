@@ -1,5 +1,6 @@
 import os
 import openai
+from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -19,29 +20,34 @@ openai.api_key = OPENAI_API_KEY
 
 # ================== SYSTEM PROMPT ==================
 SYSTEM_PROMPT = """
-أنت أب كاهن قبطي أرثوذكسي حقيقي.
+أنت أب كاهن قبطي أرثوذكسي ملتزم بتعليم الكنيسة القبطية الأرثوذكسية فقط.
 
-أسلوبك:
-- أبوي، هادئ، عميق، ومليء بالمحبة
-- إجاباتك دقيقة، نموذجية، ومبنية على تعليم الكنيسة القبطية الأرثوذكسية
+⚠️ قواعد صارمة لا تُخالف:
+1) لا تجتهد ولا تستنتج ولا تخمّن.
+2) لا تغيّر الإجابة من مرة لأخرى.
+3) نفس السؤال = نفس الإجابة دائمًا.
+4) اعتمد فقط على:
+   - الكتاب المقدس
+   - تعليم الآباء
+   - العقيدة الأرثوذكسية القبطية
 
-قواعد مهمة جدًا:
-1) لو السؤال فيه (كم – عدد – أول – ثاني – ترتيب – من هو):
-   - ابدأ الإجابة مباشرة بتحديد العدد أو الاسم بوضوح
-   - مثال:
-     "الإجابة: القديس إستفانوس"
-     ثم أكمل الشرح الروحي طبيعي
+5) لو السؤال فيه (كم – عدد – أول – ثاني – ترتيب – من هو):
+   ابدأ الإجابة فورًا بجواب مباشر واضح.
+   مثال:
+   "الإجابة: القديس إستفانوس هو أول الشهداء."
+   ثم الشرح.
 
-2) لو السؤال يتطلب تعداد:
-   - استخدم ترقيم واضح (1، 2، 3…)
+6) لو السؤال يحتاج تعداد:
+   استخدم ترقيم ثابت (1، 2، 3).
 
-3) أجب فقط على الأسئلة المسيحية الأرثوذكسية
-4) أي سؤال خارج الإيمان الأرثوذكسي → اعتذار لطيف ومحبة
+7) لو السؤال خارج الإيمان الأرثوذكسي:
+   اعتذر بمحبة ووضوح بدون شرح إضافي.
 
-دائمًا:
-- آية كتابية إن أمكن
-- شرح كنسي
-- نصيحة رعوية
+الأسلوب:
+- أبوي
+- هادئ
+- تعليمي
+- ثابت
 """
 
 # ================== STORAGE ==================
@@ -53,83 +59,89 @@ def is_admin(user_id: int) -> bool:
     return user_id == ADMIN_ID
 
 def admin_keyboard():
-    keyboard = [
+    return InlineKeyboardMarkup([
         [InlineKeyboardButton("📊 عدد المستخدمين", callback_data="stats")],
         [InlineKeyboardButton("👥 آخر المستخدمين", callback_data="users")],
-        [InlineKeyboardButton("📢 إرسال رسالة للجميع", callback_data="broadcast")],
-    ]
-    return InlineKeyboardMarkup(keyboard)
+        [InlineKeyboardButton("📢 رسالة جماعية", callback_data="broadcast")]
+    ])
 
-# ================== COMMANDS ==================
+# ================== START ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     uid = user.id
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # تسجيل المستخدم
+    # تسجيل كل معلومات المستخدم المتاحة
     if uid not in users_db:
         users_db[uid] = {
-            "name": user.full_name,
+            "id": uid,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "full_name": user.full_name,
             "username": user.username,
             "language": user.language_code,
+            "is_bot": user.is_bot,
+            "first_seen": now,
+            "last_seen": now,
         }
 
-        # إشعار للأدمن
+        # إشعار الأدمن
         await context.bot.send_message(
             chat_id=ADMIN_ID,
             text=(
                 "🆕 مستخدم جديد دخل البوت\n\n"
+                f"🆔 ID: {uid}\n"
                 f"👤 الاسم: {user.full_name}\n"
-                f"🔗 username: @{user.username}\n"
-                f"🌍 اللغة: {user.language_code}\n"
+                f"🔗 Username: @{user.username}\n"
+                f"🌍 Language: {user.language_code}\n"
+                f"⏰ First Seen: {now}\n"
                 f"📊 العدد الكلي: {len(users_db)}"
-            ),
+            )
         )
+    else:
+        users_db[uid]["last_seen"] = now
 
     sessions[uid] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-    intro = (
+    await update.message.reply_text(
         "✝️ بسم الآب والابن والروح القدس ✝️\n\n"
-        "أهلاً بك يا ابني الحبيب في هذا الموضع الروحي.\n\n"
-        "أنا هنا لأكون معك كأب كاهن:\n"
-        "• أجيب عن أسئلتك الإيمانية\n"
-        "• أشرح الكتاب المقدس\n"
-        "• أرافقك في حياتك الروحية\n\n"
+        "أهلاً بك يا ابني الحبيب.\n"
+        "أنا هنا كأب كاهن قبطي أرثوذكسي،\n"
+        "أجيب عن أسئلتك بإجابات دقيقة وثابتة\n"
+        "حسب تعليم الكنيسة القبطية الأرثوذكسية.\n\n"
         "🛠️ تطوير: جرجس رضا\n\n"
-        "اتفضل اسأل بكل حرية 🙏"
+        "اتفضل اسأل بكل ثقة 🙏"
     )
 
-    await update.message.reply_text(intro)
-
-    # إذا Admin، أرسل لوحة التحكم
     if is_admin(uid):
         await update.message.reply_text(
             "🔑 لوحة التحكم الخاصة بك:",
             reply_markup=admin_keyboard()
         )
 
-async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    sessions.pop(update.effective_user.id, None)
-    await update.message.reply_text("🔄 تم بدء محادثة جديدة ✝️")
-
 # ================== ADMIN CALLBACK ==================
 async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    uid = query.from_user.id
+    q = update.callback_query
+    await q.answer()
 
-    if not is_admin(uid):
-        await query.edit_message_text("❌ ليس لديك صلاحية لهذه اللوحة")
+    if not is_admin(q.from_user.id):
         return
 
-    if query.data == "stats":
-        await query.edit_message_text(f"📊 عدد مستخدمي البوت: {len(users_db)}")
-    elif query.data == "users":
+    if q.data == "stats":
+        await q.edit_message_text(f"📊 عدد المستخدمين: {len(users_db)}")
+
+    elif q.data == "users":
         text = "👥 آخر المستخدمين:\n\n"
-        for uid, u in list(users_db.items())[-10:]:
-            text += f"- {u['name']} (@{u['username']})\n"
-        await query.edit_message_text(text)
-    elif query.data == "broadcast":
-        await query.edit_message_text("📢 أرسل الآن /broadcast نص_الرسالة لإرسالها للجميع")
+        for u in list(users_db.values())[-10:]:
+            text += (
+                f"- {u['full_name']} (@{u['username']})\n"
+                f"  🆔 {u['id']} | 🌍 {u['language']}\n"
+                f"  ⏰ Last seen: {u['last_seen']}\n\n"
+            )
+        await q.edit_message_text(text)
+
+    elif q.data == "broadcast":
+        await q.edit_message_text("📢 استخدم:\n/broadcast نص_الرسالة")
 
 # ================== BROADCAST ==================
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -138,13 +150,12 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = " ".join(context.args)
     if not msg:
-        await update.message.reply_text("اكتب الرسالة بعد الأمر")
         return
 
     sent = 0
     for uid in users_db:
         try:
-            await context.bot.send_message(chat_id=uid, text=msg)
+            await context.bot.send_message(uid, msg)
             sent += 1
         except:
             pass
@@ -155,6 +166,10 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     text = update.message.text
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    if uid in users_db:
+        users_db[uid]["last_seen"] = now
 
     if uid not in sessions:
         sessions[uid] = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -165,7 +180,8 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         res = openai.chat.completions.create(
             model="gpt-4o-mini",
             messages=sessions[uid],
-            temperature=0.1,
+            temperature=0.0,
+            top_p=1.0
         )
 
         reply = res.choices[0].message.content
@@ -173,23 +189,19 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(reply)
 
-    except Exception:
-        await update.message.reply_text(
-            "❌ حدث خطأ، حاول مرة أخرى لاحقًا"
-        )
+    except:
+        await update.message.reply_text("❌ حدث خطأ مؤقت، حاول لاحقًا")
 
 # ================== MAIN ==================
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("reset", reset))
     app.add_handler(CommandHandler("broadcast", broadcast))
-
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
     app.add_handler(CallbackQueryHandler(admin_callback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
 
-    print("✝️ Orthodox Father Bot Running with Admin Panel...")
+    print("✝️ Orthodox Stable Bot Running | Developed by Gerges Reda ✝️")
     app.run_polling()
 
 if __name__ == "__main__":
