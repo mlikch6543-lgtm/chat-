@@ -1,11 +1,7 @@
 import os
 import openai
 from datetime import datetime
-from telegram import (
-    Update,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup
-)
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -24,28 +20,19 @@ openai.api_key = OPENAI_API_KEY
 
 # ================== SYSTEM PROMPT ==================
 SYSTEM_PROMPT = """
-أنت أب كاهن قبطي أرثوذكسي حقيقي.
+أنت أب كاهن قبطي أرثوذكسي ملتزم تمامًا بالعقيدة الأرثوذكسية القبطية.
 
-❗ قواعد لا تُخالف:
-- أجب دائمًا بنفس الصيغة التالية:
-
-✝️ الإجابة:
-(جواب مباشر وواضح)
-
-📖 الشرح الكنسي:
-(شرح حسب تعليم الكنيسة القبطية الأرثوذكسية)
-
-📜 آية كتابية:
-(آية واضحة مع المرجع)
-
-🙏 نصيحة رعوية:
-(نصيحة كأب اعتراف)
-
-- لا تغيّر ترتيب الأقسام
-- لا تحذف أي قسم
-- نفس السؤال = نفس الإجابة
-- لا تجتهد خارج تعليم الكنيسة
-- أي سؤال غير أرثوذكسي → اعتذار بمحبة فقط
+❗ قواعد صارمة:
+1) أجب بنفس الصيغة في كل سؤال:
+✝️ الإجابة: (جواب مباشر وواضح)
+📖 الشرح الكنسي: (شرح تفصيلي دقيق)
+📜 آية كتابية: (آية واضحة مع المرجع)
+🙏 نصيحة رعوية: (نصيحة أبوي مناسبة)
+2) لا تستخدم تعبيرات غير دقيقة مثل "ثلاثة أشخاص" أو أي اجتهاد شخصي
+3) نفس السؤال = نفس الإجابة دائمًا
+4) أي سؤال خارج العقيدة الأرثوذكسية → اعتذر بمحبة فقط
+5) لا تغير ترتيب الأقسام ولا تحذف أي جزء
+6) استخدم لغة أبويّة واضحة، هادئة، تعليمية، ثابتة
 """
 
 # ================== STORAGE ==================
@@ -79,6 +66,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "last_seen": now
         }
 
+        # إشعار الأدمن
         await context.bot.send_message(
             ADMIN_ID,
             f"🆕 مستخدم جديد\n"
@@ -93,7 +81,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✝️ بسم الآب والابن والروح القدس ✝️\n\n"
         "أهلاً بك يا ابني الحبيب.\n"
         "هذا البوت كنسي قبطي أرثوذكسي،\n"
-        "يرد عليك كأب كاهن بشرح، وآية، ونصيحة.\n\n"
+        "يرد عليك كأب كاهن مع الإجابة المباشرة، الشرح الكنسي، آية كتابية، ونصيحة رعوية.\n\n"
         "🛠️ تطوير: جرجس رضا\n\n"
         "اتفضل اسأل 🙏"
     )
@@ -128,12 +116,11 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif q.data.startswith("user_"):
         uid = int(q.data.split("_")[1])
         u = users_db.get(uid)
-
         if u:
             await q.edit_message_text(
-                f"👤 الاسم: {u['full_name']}\n"
+                f"👤 الاسم الكامل: {u['full_name']}\n"
                 f"🆔 ID: {u['id']}\n"
-                f"🔗 @{u['username']}\n"
+                f"🔗 Username: @{u['username']}\n"
                 f"🌍 اللغة: {u['language']}\n"
                 f"⏰ أول دخول: {u['first_seen']}\n"
                 f"⏰ آخر تفاعل: {u['last_seen']}"
@@ -159,25 +146,32 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================== CHAT ==================
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
-    users_db[uid]["last_seen"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    users_db[uid]["last_seen"] = now
+
+    if uid not in sessions:
+        sessions[uid] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     sessions[uid].append({"role": "user", "content": update.message.text})
 
-    res = openai.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=sessions[uid],
-        temperature=0.0
-    )
+    try:
+        res = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=sessions[uid],
+            temperature=0.0  # 🔥 ثبات كامل للإجابات
+        )
 
-    reply = res.choices[0].message.content
-    sessions[uid].append({"role": "assistant", "content": reply})
+        reply = res.choices[0].message.content
+        sessions[uid].append({"role": "assistant", "content": reply})
+        await update.message.reply_text(reply)
 
-    await update.message.reply_text(reply)
+    except Exception as e:
+        print(e)
+        await update.message.reply_text("❌ حدث خطأ مؤقت، حاول لاحقًا")
 
 # ================== MAIN ==================
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CallbackQueryHandler(admin_callback))
