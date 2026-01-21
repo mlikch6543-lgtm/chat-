@@ -19,35 +19,53 @@ openai.api_key = OPENAI_API_KEY
 
 # ================== SYSTEM PROMPT ==================
 SYSTEM_PROMPT = """
-أنت أب كاهن قبطي أرثوذكسي رسمي.
-هذا البوت كنسي أرثوذكسي فقط، يجيب وفق الإيمان الأرثوذكسي القوطي.
-ممنوع تمامًا أي خلط مع ديانات أو مذاهب أخرى.
+أنت أب كاهن قبطي أرثوذكسي.
+تُجيب على أي سؤال مسيحي (عقيدة، كتاب، تفسير، طقس، تاريخ كنسي، حياة روحية)
+لكن دائمًا من منظور الكنيسة القبطية الأرثوذكسية فقط.
 
-⚠️ قواعد صارمة:
-1) كل سؤال كنسي → الإجابة تكون:
-   ✝️ الإجابة
-   📖 الشرح الكنسي
-   📜 الآية الكتابية
-   🙏 النصيحة الرعوية
+✝️ مبدأ أساسي:
+- أجب على كل سؤال مسيحي يُطرح عليك
+- لا ترفض ولا تعتذر إلا إذا كان السؤال:
+  1) غير مسيحي صريح
+  2) أو فيه سخرية أو هجوم
 
-2) نفس السؤال = نفس الإجابة دائمًا، بدون أي تنويع.
+━━━━━━━━━━
+📌 شكل الإجابة (ثابت دائمًا):
+✝️ الإجابة:
+📖 الشرح الكنسي:
+📜 آية كتابية:
+🙏 نصيحة رعوية:
 
-3) الأسماء:
-- استخدم الأسماء الأرثوذكسية فقط
-- مثال: يونان (وليس يونس)، إيليا (وليس إلياس)، داود (وليس داوود)
+━━━━━━━━━━
+📌 قواعد عقائدية صارمة:
+1) استخدم المصطلحات الأرثوذكسية فقط
+   - ثلاثة أقانيم ❌ ليس ثلاثة أشخاص
+   - طبيعة واحدة متجسدة
+2) الأسماء الكتابية:
+   - يونان (وليس يونس)
+   - إيليا (وليس إلياس)
+   - داود (وليس داوود)
+3) لا تقارن مع ديانات أخرى
+4) لا تستخدم مراجع غير مسيحية
+5) نفس السؤال = نفس الإجابة
 
-4) أي سؤال خارج الإيمان الأرثوذكسي → اعتذار مختصر أبوي، بدون جدال، بدون شرح بديل.
+━━━━━━━━━━
+📌 التوسيع:
+- لو قيل: (اشرح أكتر – مثال تاني – وسّع)
+  ➜ كمل الشرح
+  ➜ لا تعتذر
+  ➜ لا تغيّر الهيكل
 
-5) درجة الحرارة = 0.0 لتوحيد الردود.
+━━━━━━━━━━
+📌 الأسلوب:
+- لغة كنسية واضحة
+- نبرة أب كاهن محب
+- تعليم + رعاية
 """
 
 # ================== STORAGE ==================
 users_db = {}
 sessions = {}
-
-# ================== HELPERS ==================
-def is_admin(uid):
-    return uid == ADMIN_ID
 
 # ================== START ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -55,7 +73,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = user.id
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # تسجيل المستخدم
     if uid not in users_db:
         users_db[uid] = {
             "id": uid,
@@ -66,24 +83,29 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "last_seen": now
         }
 
-    # إنشاء جلسة جديدة
+        await context.bot.send_message(
+            ADMIN_ID,
+            f"🆕 مستخدم جديد\n"
+            f"👤 {user.full_name}\n"
+            f"🆔 {uid}\n"
+            f"📊 العدد: {len(users_db)}"
+        )
+
     sessions[uid] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-    # رسالة ترحيبية
     await update.message.reply_text(
-         "✝️ بسم الآب والابن والروح القدس، الإله الواحد، آمين.\n\n"
+        "✝️ بسم الآب والابن والروح القدس، الإله الواحد، آمين.\n\n"
         "ابني الحبيب،\n"
-        "أهلاً بك في هذا البوت الكنسي القبطي الأرثوذكسي،\n"
-        "الموضوع بروح الكنيسة وتعليم الآباء،\n"
-        "للإجابة على الأسئلة الإيمانية والعقائدية\n"
-        "بفكر مستقيم، وتعليم واضح، ونصيحة رعوية أبوية.\n\n"
-        "كل إجابة ستجد فيها:\n"
-        "✝️ جوابًا مباشرًا\n"
-        "📖 شرحًا كنسيًا أرثوذكسيًا\n"
+        "هذا البوت الكنسي وُضع لخدمة التعليم المسيحي\n"
+        "والإجابة على الأسئلة الإيمانية والروحية\n"
+        "بفكر الكنيسة القبطية الأرثوذكسية.\n\n"
+        "كل إجابة ستشمل:\n"
+        "✝️ جوابًا واضحًا\n"
+        "📖 شرحًا كنسيًا\n"
         "📜 آية كتابية\n"
-        "🙏 توجيهًا رعويًا للحياة الروحية\n\n"
+        "🙏 توجيهًا رعويًا\n\n"
         "🛠️ تطوير: جرجس رضا\n\n"
-        "اتفضل اسأل يا ابني، والرب يديك نعمة وفهم 🙏"
+        "اسأل بثقة، والرب يرشد قلبك 🙏"
     )
 
 # ================== CHAT ==================
@@ -96,59 +118,30 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     sessions[uid].append({"role": "user", "content": update.message.text})
 
-    try:
-        response = openai.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=sessions[uid],
-            temperature=0.0
-        )
-        reply = response.choices[0].message.content
-        sessions[uid].append({"role": "assistant", "content": reply})
-        await update.message.reply_text(reply)
-    except Exception as e:
-        await update.message.reply_text("❌ حصل خطأ أثناء الرد")
-        print(e)
+    response = openai.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=sessions[uid],
+        temperature=0.0
+    )
+
+    reply = response.choices[0].message.content
+    sessions[uid].append({"role": "assistant", "content": reply})
+
+    await update.message.reply_text(reply)
 
 # ================== ADMIN ==================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if is_admin(update.effective_user.id):
+    if update.effective_user.id == ADMIN_ID:
         await update.message.reply_text(f"📊 عدد المستخدمين: {len(users_db)}")
-
-async def users(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if is_admin(update.effective_user.id):
-        text = "👥 المستخدمون:\n"
-        for u in users_db.values():
-            text += f"- {u['name']} (@{u['username']})\n"
-        await update.message.reply_text(text)
-
-async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update.effective_user.id):
-        return
-    if not context.args:
-        await update.message.reply_text("✉️ اكتب الرسالة بعد /broadcast")
-        return
-    message = " ".join(context.args)
-    for uid in users_db.keys():
-        try:
-            await context.bot.send_message(uid, f"📢 رسالة من المسؤول:\n\n{message}")
-        except:
-            continue
-    await update.message.reply_text("✅ تم إرسال الرسالة لكل المستخدمين.")
 
 # ================== MAIN ==================
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-
-    # أوامر المستخدم
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("stats", stats))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
 
-    # أوامر الإدارة
-    app.add_handler(CommandHandler("stats", stats))
-    app.add_handler(CommandHandler("users", users))
-    app.add_handler(CommandHandler("broadcast", broadcast))
-
-    print("✝️ Orthodox Coptic Bot Running | Developed by Gerges Reda ✝️")
+    print("✝️ Orthodox Christian Bot Running | Developed by Gerges Reda ✝️")
     app.run_polling()
 
 if __name__ == "__main__":
