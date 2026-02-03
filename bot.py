@@ -16,49 +16,29 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
-# ================== GEMINI ==================
+# ================== GEMINI CONFIG ==================
 genai.configure(api_key=GEMINI_API_KEY)
-
-model = genai.GenerativeModel(
-    model_name="gemini-1.5-pro",
-    generation_config={
-        "temperature": 0.0,   # ثبات التعليم
-        "top_p": 1,
-        "top_k": 1,
-    },
-)
+model = genai.GenerativeModel(model_name="gemini-1.5-pro")
 
 # ================== SYSTEM PROMPT ==================
 SYSTEM_PROMPT = """
 أنت أب كاهن قبطي أرثوذكسي، خادم تعليم ولاهوت.
 تتكلم بعقل الكنيسة القبطية الأرثوذكسية فقط.
 
-⚠️ قواعد إيمانية صارمة لا يجوز كسرها:
+⚠️ قواعد صارمة:
 - الله واحد في الجوهر، مثلث الأقانيم (الآب، الابن، الروح القدس).
 - الأقانيم ليسوا ثلاثة أشخاص.
 - الابن مولود من الآب قبل كل الدهور.
 - الروح القدس منبثق من الآب.
 - الاسم الكتابي الصحيح: يونان النبي.
 - لا تستخدم أي مصطلحات إسلامية أو بروتستانتية أو كاثوليكية.
-- لا تذكر آراء شخصية أو فلسفية.
-- لا تتأثر ببلد المستخدم أو لغته.
-- لا تعتذر عن أي سؤال مسيحي أرثوذكسي.
+- نفس السؤال = نفس الإجابة دائمًا.
 
-📌 عند أي سؤال:
-- أجب أولًا إجابة عقائدية دقيقة.
-- ثم شرح كنسي آبائي.
-- ثم آية كتابية واضحة.
-- ثم تطبيق رعوي عملي.
-
-✝️ ترتيب الإجابة إلزامي ولا يتغير:
-
-✝️ الإجابة العقائدية:
-📖 الشرح الكنسي الأرثوذكسي:
+📌 ترتيب الإجابة:
+✝️ الإجابة المباشرة:
+📖 الشرح الكنسي:
 📜 آية كتابية:
-🙏 تطبيق رعوي:
-
-✝️ الأسلوب:
-أب كاهن، هادئ، واضح، تعليمي، خالي من أي خلط عقائدي.
+🙏 نصيحة رعوية:
 """
 
 # ================== STORAGE ==================
@@ -84,7 +64,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(
             chat_id=ADMIN_ID,
             text=(
-                "🆕 مستخدم جديد\n"
+                f"🆕 مستخدم جديد\n"
                 f"👤 {user.full_name}\n"
                 f"🆔 {uid}\n"
                 f"🌍 اللغة: {user.language_code}\n"
@@ -98,16 +78,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✝️ بسم الآب والابن والروح القدس، الإله الواحد، آمين.\n\n"
         "ابني الحبيب،\n"
         "هذا البوت هو خدمة تعليمية كنسية قبطية أرثوذكسية،\n"
-        "تُقدَّم فيها الإجابة بحسب إيمان الكنيسة الواحدة،\n"
-        "كما تسلمناه من الآباء الرسل والقديسين.\n\n"
-        "اسأل بثقة، وستجد تعليمًا مستقيمًا بلا خلط.\n\n"
+        "تُقدَّم فيها الإجابة بحسب إيمان الكنيسة الواحدة.\n\n"
         "🛠️ تطوير وخدمة: جرجس رضا"
     )
 
-# ================== GEMINI (SAFE) ==================
+# ================== GEMINI SAFE ==================
 def gemini_answer(prompt: str) -> str:
-    response = model.generate_content(prompt)
-    return response.text.strip()
+    try:
+        response = model.generate_content(
+            prompt,
+            temperature=0.0,
+            top_p=1,
+            top_k=1
+        )
+        return response.text.strip()
+    except Exception as e:
+        print("Gemini API error:", e)
+        return "❌ حدث خطأ أثناء معالجة السؤال، حاول لاحقًا."
 
 # ================== CHAT ==================
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -117,14 +104,10 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     question = update.message.text.strip()
     prompt = sessions.get(uid, SYSTEM_PROMPT) + "\n\nسؤال المستخدم:\n" + question
 
-    try:
-        reply = await asyncio.to_thread(gemini_answer, prompt)
-    except Exception:
-        reply = "حدث خطأ تقني، حاول مرة أخرى."
-
+    reply = await asyncio.to_thread(gemini_answer, prompt)
     await update.message.reply_text(reply)
 
-# ================== ADMIN ==================
+# ================== ADMIN COMMANDS ==================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
@@ -137,13 +120,9 @@ async def users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = "👥 المستخدمون:\n\n"
     for u in users_db.values():
         text += (
-            f"👤 {u['name']}\n"
-            f"🆔 {u['id']}\n"
-            f"🌍 {u['language']}\n"
-            f"🕊️ أول دخول: {u['first_seen']}\n"
-            f"⏱️ آخر نشاط: {u['last_seen']}\n\n"
+            f"👤 {u['name']}\n🆔 {u['id']}\n🌍 {u['language']}\n"
+            f"🕊️ أول دخول: {u['first_seen']}\n⏱️ آخر نشاط: {u['last_seen']}\n\n"
         )
-
     await update.message.reply_text(text)
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
